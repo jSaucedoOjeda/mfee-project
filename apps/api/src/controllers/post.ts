@@ -1,154 +1,101 @@
-import { getCategory } from './category';
-import { Post } from '../models/post';
-import { Comment } from '../models/comment';
+import Post from '../models/post';
+import Comment from '../models/comment';
 
-const posts: Array<Post> = [];
-const comments: Array<Comment> = [];
-
-const getPostById = (id: string) => {
-  const post = posts.find((p) => p.id === id);
-
-  if (!post) {
-    return;
+const getPosts = async (req, res) => {
+  try {
+    const posts = await Post.find().populate('category').exec();
+    res.status(200).json(posts);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
   }
-
-  const postCategory = getCategory(post.category);
-  const postComments = comments.filter((c) => post.comments.includes(c.id));
-
-  return {
-    ...post,
-    category: postCategory,
-    comments: postComments
-  };
 };
 
-const getPosts = (req, res) => {
-  res.status(200).json(posts);
-};
-
-const getPostsByCategory = (req, res) => {
+const getPostsByCategory = async (req, res) => {
   const { category } = req.params;
-  const postsByCategory = posts.filter((p) => p.category === category);
-  res.status(200).json(postsByCategory);
+  try {
+    const posts = await Post.find({ category }).populate('category').exec();
+    res.status(200).json(posts);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
+  }
 };
 
-const getPost = (req, res) => {
+const getPostById = async (req, res) => {
   const { id } = req.params;
-  const post = getPostById(id);
-
-  if (!post) {
-    return res.status(404).json({ message: 'Post not found' });
+  try {
+    const post = await Post.findById(id).populate('category').populate('comments').exec();
+    if (!post) {
+      return res.status(404).send({ message: 'Post not found' });
+    }
+    res.status(200).json(post);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
   }
-
-  res.status(200).json(post);
 };
 
-const createPost = (req, res) => {
-  const { title, image, description, category } = req.body;
-
-  if (!title) {
-    return res.status(400).json({ message: 'Title is required' });
+const createPost = async (req, res) => {
+  try {
+    const post = await Post.create(req.body);
+    res.status(201).json(post);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
   }
-
-  if (!image) {
-    return res.status(400).json({ message: 'Image is required' });
-  }
-
-  if (!description) {
-    return res.status(400).json({ message: 'Description is required' });
-  }
-
-  if (!category) {
-    return res.status(400).json({ message: 'Category is required' });
-  }
-
-  const newPost: Post = {
-    id: Date.now().toString(),
-    title,
-    image,
-    description,
-    category,
-    comments: []
-  };
-
-  posts.push(newPost);
-  res.status(201).json(newPost);
 };
 
-const createPostComment = (req, res) => {
+const createPostComment = async (req, res) => {
   const { id } = req.params;
-  const { author, content } = req.body;
+  try {
+    const post = await Post.findById(id);
 
-  if (!author) {
-    return res.status(400).json({ message: 'Author is required' });
+    if (!post) {
+      return res.status(404).send({ message: 'Post not found' });
+    }
+    const newComment = await Comment.create(req.body);
+    post.comments.push(newComment._id);
+    await post.save();
+    res.status(201).json(newComment);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
   }
-
-  if (!content) {
-    return res.status(400).json({ message: 'Content is required' });
-  }
-
-  const newComment: Comment = {
-    id: Date.now().toString(),
-    author,
-    content
-  };
-
-  comments.push(newComment);
-  const post = posts.find((p) => p.id === id);
-  post.comments.push(newComment.id);
-  res.status(201).json(newComment);
 };
 
-const updatePost = (req, res) => {
+const updatePost = async (req, res) => {
   const { id } = req.params;
-  const { title, image, description, category } = req.body;
-  const postIndex = posts.findIndex((p) => p.id === id);
-
-  if (postIndex === -1) {
-    return res.status(404).json({ message: 'Post not found' });
+  try {
+    const post = await Post.findByIdAndUpdate(id, req.body, { new: true });
+    if (!post) {
+      return res.status(404).send({ message: 'Post not found' });
+    }
+    res.status(200).json(post);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
   }
-
-  const post = posts[postIndex];
-  const newPost = { ...post };
-
-  if (title && title !== post.title) {
-    newPost.title = title;
-  }
-
-  if (image && image !== post.image) {
-    newPost.image = image;
-  }
-
-  if (description && description !== post.description) {
-    newPost.description = description;
-  }
-
-  if (category && category !== post.category) {
-    newPost.category = category;
-  }
-
-  posts[postIndex] = newPost;
-  const updatedPost = getPostById(id);
-  res.status(200).json(updatedPost);
 };
 
-const deletePost = (req, res) => {
+const deletePost = async (req, res) => {
   const { id } = req.params;
-  const postIndex = posts.findIndex((p) => p.id === id);
-
-  if (postIndex === -1) {
-    return res.status(404).json({ message: 'Post not found' });
+  try {
+    const post = await Post.findByIdAndDelete(id);
+    if (!post) {
+      return res.status(404).send({ message: 'Post not found' });
+    }
+    res.status(204).json(post);
+  } catch (error) {
+    const { message } = error;
+    res.status(500).json({ message });
   }
-
-  const deletedPost = getPostById(id);
-  posts.splice(postIndex, 1);
-  res.status(200).json(deletedPost);
 };
 
 export default {
   getPosts,
   getPostsByCategory,
-  getPost,
+  getPostById,
   createPost,
   createPostComment,
   updatePost,

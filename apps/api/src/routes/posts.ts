@@ -1,5 +1,4 @@
 import express from 'express';
-
 import postController from '../controllers/post';
 
 const router = express.Router();
@@ -8,7 +7,7 @@ router.get('/', postController.getPosts);
 
 router.get('/category/:category', postController.getPostsByCategory);
 
-router.get('/:id', postController.getPost);
+router.get('/:id', postController.getPostById);
 
 router.post('/', postController.createPost);
 
